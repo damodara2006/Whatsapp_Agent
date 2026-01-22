@@ -8,6 +8,7 @@ import pprint
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
+from langchain_core.runnables import RunnableLambda
 load_dotenv()
 app = FastAPI()
 llm = init_chat_model("groq:llama-3.1-8b-instant", temperature=0.2)
@@ -41,7 +42,13 @@ def send_whatsapp_text_message(to : str, message:str):
         return "Message sent ✅"
     else :
         return "Error"
+
+
+# def generate_input(from_str : str, message : str) -> str:
+#     data = llm.invoke(f"Your task is to generate a text like ex : 'send a whatsapp message to 919043402788 as a message 'This is from agent' using the number to {from_str} and the message {message}")  
+#     print(data)
     
+# generate_input("910000", "heyyy")
 
 toolKit = [send_whatsapp_text_message]
 agent = create_agent(
@@ -50,6 +57,15 @@ agent = create_agent(
 )
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
+
+
+def whatsapp_reply_generate(message: str) -> str:
+    """Generate a polite WhatsApp reply."""
+    prompt = f"Reply in short, friendly tone: {message}"
+    return llm.invoke(prompt).content
+# print(whatsapp_reply_generate("what are you doing"))/
+
+# whatsapp_reply_generate_ruunable = RunnableLambda(whatsapp_reply_generate)
 # example_query = "send a whatsapp message to 919043402788 as a message 'This is from agent'"
 # for mode , event in agent.stream(
 #     {"messages": [("user", example_query)]},
@@ -75,7 +91,20 @@ async def webhook(request: Request):
     body = await request.body()
     data = await request.json()
     print("✅ WEBHOOK HIT:", body.decode("utf-8"))
-    print("Message is ✅", data["entry"][0]["changes"][0]["messages"][0]["text"]["body"])
+    msg = data["entry"][0]["changes"][0]["value"]["messages"][0]["text"]["body"]
+    value = data["entry"][0]["changes"][0]["value"]
+    from_number = value["messages"][0]["from"]
+    # chain = whatsapp_reply_generate
+    llm_message = whatsapp_reply_generate(msg) 
+    example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
+    for mode , event in agent.stream({"messages": [("user", example_query)]},stream_mode=["updates"]):
+        # print(event)
+        if "tools" in event:
+            tool_msgs = event["tools"]["messages"]
+            if tool_msgs:
+                tool_res = tool_msgs[-1].content
+        # print(response)
+    print("tool_res =", tool_res)
     return PlainTextResponse(content="OK", status_code=200)
 
 @app.get("/privacy")
