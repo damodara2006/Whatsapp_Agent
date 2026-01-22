@@ -97,6 +97,7 @@ async def webhook(request: Request):
     # chain = whatsapp_reply_generate
     llm_message = whatsapp_reply_generate(msg) 
     example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
+    tool_res = None
     for mode , event in agent.stream({"messages": [("user", example_query)]},stream_mode=["updates"]):
         # print(event)
         if "tools" in event:
