@@ -73,8 +73,9 @@ async def webhook(request: Request):
 
    
     body = await request.body()
+    data = await request.json()
     print("✅ WEBHOOK HIT:", body.decode("utf-8"))
-
+    print("Message is ✅", data["entry"][0]["changes"][0]["messages"][0]["text"]["body"])
     return PlainTextResponse(content="OK", status_code=200)
 
 @app.get("/privacy")
