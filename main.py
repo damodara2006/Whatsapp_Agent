@@ -48,7 +48,7 @@ agent = create_agent(
     model = llm,
     tools=toolKit
 )
-# VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
 # example_query = "send a whatsapp message to 919043402788 as a message 'This is from agent'"
 # for mode , event in agent.stream(
