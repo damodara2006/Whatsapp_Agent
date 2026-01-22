@@ -6,7 +6,7 @@ import os
 import json
 import pprint
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, requests
+from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 load_dotenv()
 app = FastAPI()
@@ -36,6 +36,7 @@ def send_whatsapp_text_message(to : str, message:str):
 
     }
     res = requests.post(url=url, headers=headers, json=payload)
+    print(res.json())
     if res.status_code == 200:
         return "Message sent ✅"
     else :
@@ -49,22 +50,21 @@ agent = create_agent(
 )
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
-# example_query = "send a whatsapp message to 919043402788 as a message 'This is from agent'"
-# for mode , event in agent.stream(
-#     {"messages": [("user", example_query)]},
-#     stream_mode=["updates"],
-# ):
-#     if "tools" in event:
-#         tool_msgs = event["tools"]["messages"]
-#         if tool_msgs:
-#             tool_res = tool_msgs[-1].content
-# # print(response)
+example_query = "send a whatsapp message to 919043402788 as a message 'This is from agent'"
+for mode , event in agent.stream(
+    {"messages": [("user", example_query)]},
+    stream_mode=["updates"],
+):
+    print(event)
+    # if "tools" in event:
+    #     tool_msgs = event["tools"]["messages"]
+    #     if tool_msgs:
+    #         tool_res = tool_msgs[-1].content
+# print(response)
 # print("tool_res =", tool_res)
 
 @app.api_route("/webhook", methods=["GET", "POST"])
 async def webhook(request: Request):
-
-   
     if request.method == "GET":
         params = request.query_params
         if params.get("hub.verify_token") == VERIFY_TOKEN:
