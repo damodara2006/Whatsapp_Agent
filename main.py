@@ -60,9 +60,22 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
 
 def whatsapp_reply_generate(message: str) -> str:
-    """Generate a polite WhatsApp reply."""
-    prompt = f"Reply in short, friendly tone: {message}"
+    """
+    Generate a polite WhatsApp reply.
+    If user asks who built you, reply: "I was built by Damodara Prakash using LangChain."
+    """
+    prompt = f"""
+You are a WhatsApp support bot.
+Reply in short, friendly tone.
+
+Rule:
+If the user asks who built you / created you / developer name -> reply exactly:
+"I was built by Damodara Prakash using LangChain, His Github https://github.com/damodara2006"
+
+User message: {message}
+"""
     return llm.invoke(prompt).content
+
 # print(whatsapp_reply_generate("what are you doing"))/
 
 # whatsapp_reply_generate_ruunable = RunnableLambda(whatsapp_reply_generate)
