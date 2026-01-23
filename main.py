@@ -13,7 +13,6 @@ load_dotenv()
 app = FastAPI()
 llm = init_chat_model("groq:llama-3.1-8b-instant", temperature=0.2)
 token = os.getenv("WA_ACCESS_TOKEN")
-
 @tool
 def send_whatsapp_text_message(to : str, message:str):
     """Send whatsapp text messages 
