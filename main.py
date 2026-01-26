@@ -160,6 +160,7 @@ async def webhook(request: Request):
         return PlainTextResponse(content="OK", status_code=200)
     elif msg_type == "document":
         # url = message.get("url")  
+        print("Document found")
         message_id = message.get("document",{}).get("id")
         url = request.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
         url = requests.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
