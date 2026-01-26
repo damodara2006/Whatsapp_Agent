@@ -70,6 +70,8 @@ agent = create_agent(
     tools=toolKit
 )
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+WA_TOKEN = os.getenv("WA_ACCESS_TOKEN")
+
 
 
 
@@ -91,7 +93,25 @@ User message: {message}
     return llm.invoke(prompt).content
 
 # agent.
+async def upload(filename: str):
+    upload_dir = "Docs"
+    os.makedirs(upload_dir, exist_ok=True)
 
+    save_path = os.path.join(upload_dir, file.filename)
+
+    with open(save_path, "wb") as f:
+        f.write(await file.read())
+
+    loader = PyPDFLoader(save_path)
+    docs = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100
+    )
+    chunks = splitter.split_documents(docs)
+
+    vectorStore.add_documents(chunks)
 
 @app.api_route("/webhook", methods=["GET", "POST"])
 async def webhook(request: Request):
@@ -108,7 +128,7 @@ async def webhook(request: Request):
     value = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {})
     message = value.get("messages", [{}])[0]
 
-    msg = message.get("text", {}).get("body")     # only exists for text
+    msg = message.get("text", {}).get("body")     
     from_number = message.get("from")
     msg_type = message.get("type")
     # chain = whatsapp_reply_generate
@@ -127,7 +147,24 @@ async def webhook(request: Request):
         print("tool_res =", tool_res)
         return PlainTextResponse(content="OK", status_code=200)
     elif msg_type == "document":
-        print("Doc found")
+        # url = message.get("url")  
+        message_id = message.get("document",{}).get("id")
+        url = request.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
+        url = requests.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
+        BASE_DIR = "Docs"
+        SAVE_DIR = os.path.join(BASE_DIR,"temp.pdf")
+        # with open()
+        headers = {
+            "Authorization": f"Bearer {WA_TOKEN}"
+        }
+        base_url = url.json().get("url")
+
+        file = requests.get(base_url, headers=headers, allow_redirects=True)
+        # print(file.json())
+        with open(SAVE_DIR, "wb") as f:
+            f.write(file.content)
+            
+        print("filename", message.get("document",{}).get("filename"))
         return PlainTextResponse(content="OK", status_code=200)
         
 
