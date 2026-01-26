@@ -9,10 +9,25 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from langchain_core.runnables import RunnableLambda
+from langchain_community.tools import DuckDuckGoSearchRun
+
+search = DuckDuckGoSearchRun()
+
+
 load_dotenv()
 app = FastAPI()
 llm = init_chat_model("groq:llama-3.1-8b-instant", temperature=0.2)
 token = os.getenv("WA_ACCESS_TOKEN")
+@tool
+def search_browser_or_internet(message : str) -> str:
+    """Used to search questions for the llm cannot answer you can search the data using this in interner
+    Example : if you dont know the current stack price you can use this to search that price using internet
+    """
+    msg = search.invoke(message)
+    return msg
+    
+# search_browser_or_internet("geyy")
+
 @tool
 def send_whatsapp_text_message(to : str, message:str):
     """Send whatsapp text messages 
@@ -49,7 +64,7 @@ def send_whatsapp_text_message(to : str, message:str):
     
 # generate_input("910000", "heyyy")
 
-toolKit = [send_whatsapp_text_message]
+toolKit = [send_whatsapp_text_message, search_browser_or_internet]
 agent = create_agent(
     model = llm,
     tools=toolKit
@@ -75,21 +90,8 @@ User message: {message}
 """
     return llm.invoke(prompt).content
 
-# print(whatsapp_reply_generate("what are you doing"))/
+# agent.
 
-# whatsapp_reply_generate_ruunable = RunnableLambda(whatsapp_reply_generate)
-# example_query = "send a whatsapp message to 919043402788 as a message 'This is from agent'"
-# for mode , event in agent.stream(
-#     {"messages": [("user", example_query)]},
-#     stream_mode=["updates"],
-# ):
-#     print(event)
-    # if "tools" in event:
-    #     tool_msgs = event["tools"]["messages"]
-    #     if tool_msgs:
-    #         tool_res = tool_msgs[-1].content
-# print(response)
-# print("tool_res =", tool_res)
 
 @app.api_route("/webhook", methods=["GET", "POST"])
 async def webhook(request: Request):
@@ -106,19 +108,25 @@ async def webhook(request: Request):
     msg = data["entry"][0]["changes"][0]["value"]["messages"][0]["text"]["body"]
     value = data["entry"][0]["changes"][0]["value"]
     from_number = value["messages"][0]["from"]
+    msg_type = data["entry"][0]["changes"][0]["value"]["messages"][0]["type"]
     # chain = whatsapp_reply_generate
-    llm_message = whatsapp_reply_generate(msg) 
-    example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
-    tool_res = None
-    for mode , event in agent.stream({"messages": [("user", example_query)]},stream_mode=["updates"]):
-        # print(event)
-        if "tools" in event:
-            tool_msgs = event["tools"]["messages"]
-            if tool_msgs:
-                tool_res = tool_msgs[-1].content
-        # print(response)
-    print("tool_res =", tool_res)
-    return PlainTextResponse(content="OK", status_code=200)
+    if msg_type == "text":
+        llm_message = whatsapp_reply_generate(msg) 
+        example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
+        tool_res = None
+        for mode , event in agent.stream({"messages": [("user", example_query)]},stream_mode=["updates"]):
+            # print(event)
+            if "tools" in event:
+                tool_msgs = event["tools"]["messages"]
+                if tool_msgs:
+                    tool_res = tool_msgs[-1].content
+            # print(response)
+        print("tool_res =", tool_res)
+        return PlainTextResponse(content="OK", status_code=200)
+    elif msg_type == "document":
+        print("Doc found")
+        return PlainTextResponse(content="OK", status_code=200)
+        
 
 @app.get("/privacy")
 def privacy():
