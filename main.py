@@ -10,7 +10,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from langchain_core.runnables import RunnableLambda
 from langchain_community.tools import DuckDuckGoSearchRun
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_ollama import OllamaEmbeddings
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import PyPDFLoader
 search = DuckDuckGoSearchRun()
 
 
@@ -27,6 +30,12 @@ def search_browser_or_internet(message : str) -> str:
     return msg
     
 # search_browser_or_internet("geyy")
+
+
+embedding_llm = OllamaEmbeddings(
+    model="nomic-embed-text",
+    base_url="https://99lr1l5s-11434.inc1.devtunnels.ms"
+)
 
 @tool
 def send_whatsapp_text_message(to : str, message:str):
@@ -72,7 +81,10 @@ agent = create_agent(
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 WA_TOKEN = os.getenv("WA_ACCESS_TOKEN")
 
-
+vectorStore = Chroma(
+    embedding_function=embedding_llm,
+    persist_directory="./VectorDB"
+)
 
 
 def whatsapp_reply_generate(message: str) -> str:
@@ -93,14 +105,14 @@ User message: {message}
     return llm.invoke(prompt).content
 
 # agent.
-async def upload(filename: str):
-    upload_dir = "Docs"
-    os.makedirs(upload_dir, exist_ok=True)
+async def upload(save_path: str):
+    # upload_dir = "Docs"
+    # os.makedirs(upload_dir, exist_ok=True)
 
-    save_path = os.path.join(upload_dir, file.filename)
+    # save_path = os.path.join(upload_dir, filename)
 
-    with open(save_path, "wb") as f:
-        f.write(await file.read())
+    # with open(save_path, "wb") as f:
+    #     f.write(await file.read())
 
     loader = PyPDFLoader(save_path)
     docs = loader.load()
@@ -110,7 +122,7 @@ async def upload(filename: str):
         chunk_overlap=100
     )
     chunks = splitter.split_documents(docs)
-
+    print("chunks", chunks)
     vectorStore.add_documents(chunks)
 
 @app.api_route("/webhook", methods=["GET", "POST"])
@@ -152,7 +164,8 @@ async def webhook(request: Request):
         url = request.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
         url = requests.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
         BASE_DIR = "Docs"
-        SAVE_DIR = os.path.join(BASE_DIR,"temp.pdf")
+        FILE_NAME = message.get("document",{}).get("filename")
+        SAVE_DIR = os.path.join(BASE_DIR,FILE_NAME)
         # with open()
         headers = {
             "Authorization": f"Bearer {WA_TOKEN}"
@@ -165,6 +178,7 @@ async def webhook(request: Request):
             f.write(file.content)
             
         print("filename", message.get("document",{}).get("filename"))
+        upload(SAVE_DIR)
         return PlainTextResponse(content="OK", status_code=200)
         
 
