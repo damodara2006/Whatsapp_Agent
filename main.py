@@ -105,10 +105,12 @@ async def webhook(request: Request):
     body = await request.body()
     data = await request.json()
     print("✅ WEBHOOK HIT:", body.decode("utf-8"))
-    msg = data["entry"][0]["changes"][0]["value"]["messages"][0]["text"]["body"]
-    value = data["entry"][0]["changes"][0]["value"]
-    from_number = value["messages"][0]["from"]
-    msg_type = data["entry"][0]["changes"][0]["value"]["messages"][0]["type"]
+    value = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {})
+    message = value.get("messages", [{}])[0]
+
+    msg = message.get("text", {}).get("body")     # only exists for text
+    from_number = message.get("from")
+    msg_type = message.get("type")
     # chain = whatsapp_reply_generate
     print("Document type is : ", msg_type)
     if msg_type == "text":
