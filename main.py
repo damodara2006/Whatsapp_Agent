@@ -106,14 +106,6 @@ User message: {message}
 
 # agent.
 async def upload(save_path: str):
-    # upload_dir = "Docs"
-    # os.makedirs(upload_dir, exist_ok=True)
-
-    # save_path = os.path.join(upload_dir, filename)
-
-    # with open(save_path, "wb") as f:
-    #     f.write(await file.read())
-
     loader = PyPDFLoader(save_path)
     docs = loader.load()
 
@@ -121,9 +113,13 @@ async def upload(save_path: str):
         chunk_size=1000,
         chunk_overlap=100
     )
+
     chunks = splitter.split_documents(docs)
-    print("chunks", chunks)
+    print("chunks count =", len(chunks))
+
     vectorStore.add_documents(chunks)
+    return True
+
 
 @app.api_route("/webhook", methods=["GET", "POST"])
 async def webhook(request: Request):
@@ -133,54 +129,69 @@ async def webhook(request: Request):
             return PlainTextResponse(content=params.get("hub.challenge"), status_code=200)
         return PlainTextResponse(content="Invalid token", status_code=403)
 
-    
     body = await request.body()
     data = await request.json()
     print("✅ WEBHOOK HIT:", body.decode("utf-8"))
+
     value = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {})
     message = value.get("messages", [{}])[0]
 
-    msg = message.get("text", {}).get("body")     
+    msg = message.get("text", {}).get("body")
     from_number = message.get("from")
     msg_type = message.get("type")
-    # chain = whatsapp_reply_generate
-    print("Document type is : ", msg_type)
+
+    print("Message type:", msg_type)
+
     if msg_type == "text":
-        llm_message = whatsapp_reply_generate(msg) 
+        llm_message = whatsapp_reply_generate(msg)
+
         example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
+
         tool_res = None
-        for mode , event in agent.stream({"messages": [("user", example_query)]},stream_mode=["updates"]):
-            # print(event)
+        for mode, event in agent.stream({"messages": [("user", example_query)]}, stream_mode=["updates"]):
             if "tools" in event:
                 tool_msgs = event["tools"]["messages"]
                 if tool_msgs:
                     tool_res = tool_msgs[-1].content
-            # print(response)
+
         print("tool_res =", tool_res)
         return PlainTextResponse(content="OK", status_code=200)
-    elif msg_type == "document":
-        # url = message.get("url")  
-        print("Document found")
-        message_id = message.get("document",{}).get("id")
-        url = request.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
-        url = requests.get(f"https://graph.facebook.com/v24.0/{message_id}?access_token={WA_TOKEN}")
-        BASE_DIR = "Docs"
-        FILE_NAME = message.get("document",{}).get("filename")
-        SAVE_DIR = os.path.join(BASE_DIR,FILE_NAME)
-        # with open()
-        headers = {
-            "Authorization": f"Bearer {WA_TOKEN}"
-        }
-        base_url = url.json().get("url")
 
-        file = requests.get(base_url, headers=headers, allow_redirects=True)
-        # print(file.json())
-        with open(SAVE_DIR, "wb") as f:
-            f.write(file.content)
-            
-        print("filename", message.get("document",{}).get("filename"))
-        await upload(SAVE_DIR)
+    elif msg_type == "document":
+        print("Document found ✅")
+
+        message_id = message.get("document", {}).get("id")
+        file_name = message.get("document", {}).get("filename", "temp.pdf")
+
+        BASE_DIR = "Docs"
+        os.makedirs(BASE_DIR, exist_ok=True)
+
+        save_path = os.path.join(BASE_DIR, file_name)
+
+        headers = {"Authorization": f"Bearer {WA_TOKEN}"}
+
+        # 1) Get download URL from Graph API
+        media_res = requests.get(
+            f"https://graph.facebook.com/v24.0/{message_id}",
+            headers=headers
+        )
+        base_url = media_res.json().get("url")
+
+        # 2) Download actual PDF
+        file_res = requests.get(base_url, headers=headers, allow_redirects=True)
+
+        # 3) Save file
+        with open(save_path, "wb") as f:
+            f.write(file_res.content)
+
+        print("Saved ✅", save_path)
+
+        # 4) Load + chunk + store
+        await upload(save_path)
+
         return PlainTextResponse(content="OK", status_code=200)
+
+    return PlainTextResponse(content="OK", status_code=200)       
         
 
 @app.get("/privacy")
