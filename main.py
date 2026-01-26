@@ -178,7 +178,7 @@ async def webhook(request: Request):
             f.write(file.content)
             
         print("filename", message.get("document",{}).get("filename"))
-        upload(SAVE_DIR)
+        await upload(SAVE_DIR)
         return PlainTextResponse(content="OK", status_code=200)
         
 
