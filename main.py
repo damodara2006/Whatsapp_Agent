@@ -101,7 +101,7 @@ async def webhook(request: Request):
             return PlainTextResponse(content=params.get("hub.challenge"), status_code=200)
         return PlainTextResponse(content="Invalid token", status_code=403)
 
-   
+    
     body = await request.body()
     data = await request.json()
     print("✅ WEBHOOK HIT:", body.decode("utf-8"))
@@ -110,6 +110,7 @@ async def webhook(request: Request):
     from_number = value["messages"][0]["from"]
     msg_type = data["entry"][0]["changes"][0]["value"]["messages"][0]["type"]
     # chain = whatsapp_reply_generate
+    print("Document type is : ", msg_type)
     if msg_type == "text":
         llm_message = whatsapp_reply_generate(msg) 
         example_query = f"send a whatsapp message to {from_number} as a message '{llm_message}'"
